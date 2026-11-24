@@ -1,7 +1,5 @@
 """Qwen3-1.7B with the fine-tuned LoRA adapter, answering on the CPU."""
 
-import threading
-
 import torch
 from huggingface_hub import snapshot_download
 from peft import PeftModel
@@ -34,17 +32,23 @@ class Extractor:
         # model, with no extra adapter matrix multiplications per token.
         adapted = PeftModel.from_pretrained(base, ADAPTER, revision=ADAPTER_REVISION)
         self.model = adapted.merge_and_unload().eval()
-        # One generation at a time: torch already uses every core for a single one.
-        self.lock = threading.Lock()
+        # Generation continues at the right end of each row, so pad shorter prompts on the left.
+        self.tokenizer.padding_side = "left"
 
-    def generate(self, text: str) -> str:
-        """The raw answer for one bulletin, built exactly as in training (finetune.prompt)."""
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": text}]
-        prompt = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
-        )
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        with self.lock, torch.no_grad():
+    def generate_batch(self, texts: list[str]) -> list[str]:
+        """The raw answers for several bulletins in one forward pass per token. The prompt is
+        built exactly as in training (finetune.prompt in avalanche-llm)."""
+        prompts = [
+            self.tokenizer.apply_chat_template(
+                [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": text}],
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
+            for text in texts
+        ]
+        inputs = self.tokenizer(prompts, return_tensors="pt", padding=True)
+        with torch.no_grad():
             output = self.model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS, do_sample=False)
-        answer = output[0, inputs["input_ids"].shape[1] :]
-        return self.tokenizer.decode(answer, skip_special_tokens=True).strip()
+        answers = output[:, inputs["input_ids"].shape[1] :]
+        return [a.strip() for a in self.tokenizer.batch_decode(answers, skip_special_tokens=True)]
