@@ -1,0 +1,44 @@
+[project]
+name = "avalanche-api"
+version = "0.1.0"
+description = "A REST API that serves a fine-tuned small model for Swiss avalanche bulletins."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "pydantic>=2.9",
+    "torch>=2.4",
+    "transformers>=4.56",
+    "peft>=0.15",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.2", "httpx>=0.27", "ruff>=0.6"]
+
+# The default torch wheel on Linux bundles CUDA (several GB). The API runs on a CPU.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.9,<0.10"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "avalanche_api"
+
+[tool.pytest.ini_options]
+# The slow test downloads the real model (3.4 GB): run it with pytest -m slow.
+addopts = "-m 'not slow'"
+markers = ["slow: runs the real model"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
