@@ -3,6 +3,7 @@
 import threading
 
 import torch
+from huggingface_hub import snapshot_download
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -14,6 +15,12 @@ ADAPTER = "jth00/qwen3-1.7b-avalanche-lora"
 BASE_REVISION = "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
 ADAPTER_REVISION = "ced385b5b585ceb02cf072ee4e4a95c7d809b057"
 MAX_NEW_TOKENS = 512
+
+
+def download() -> None:
+    """Fetch both models into the Hugging Face cache, e.g. while building the Docker image."""
+    snapshot_download(BASE_MODEL, revision=BASE_REVISION)
+    snapshot_download(ADAPTER, revision=ADAPTER_REVISION)
 
 
 class Extractor:
