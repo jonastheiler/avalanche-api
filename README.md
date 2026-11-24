@@ -1,14 +1,3 @@
----
-# Hugging Face Spaces reads this block: build the Dockerfile, serve on port 7860.
-title: Avalanche bulletin API
-emoji: 🏔️
-colorFrom: blue
-colorTo: gray
-sdk: docker
-app_port: 7860
-short_description: Swiss avalanche bulletins to JSON with a fine-tuned Qwen3-1.7B
----
-
 # avalanche-api
 
 A REST API that reads a Swiss avalanche bulletin and returns its avalanche problems as
@@ -33,18 +22,11 @@ curl -X POST http://127.0.0.1:8000/extract -H "Content-Type: application/json" \
   -d '{"text": "Gliding avalanches are possible on steep grassy slopes."}'
 ```
 
-With Docker, the image has the models baked in (6.5 GB) and serves on port 7860:
+With Docker, the image has the models baked in (6.5 GB) and runs on any server:
 
 ```bash
 docker build -t avalanche-api .
-docker run -p 7860:7860 avalanche-api
-```
-
-Deploy to a Hugging Face Space (Docker SDK, free CPU, 2 vCPUs: about a minute per answer):
-
-```bash
-hf repos create <user>/avalanche-api --type space --space-sdk docker
-hf upload <user>/avalanche-api . --repo-type space   --exclude ".venv*" --exclude ".git*" --exclude "*cache*"
+docker run -p 8000:8000 avalanche-api
 ```
 
 Tests: `uv run pytest` (fake model, a second) and `uv run pytest -m slow` (real model).
