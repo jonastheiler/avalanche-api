@@ -35,7 +35,7 @@ Tests: `uv run pytest` (fake model, a second) and `uv run pytest -m slow` (real 
 
 `uv run python loadtest.py --concurrency 8` sends 16 real bulletins (4 per language) to a
 running server. `MAX_BATCH_SIZE` sets how many requests share one pass through the model.
-On a laptop CPU (float32, torch using 4 threads):
+On a laptop CPU (float32, torch using 4 threads), before prefix caching (below):
 
 | batch size | requests at once | p50 latency | p95 latency | requests/min |
 |---|---|---|---|---|
@@ -51,8 +51,15 @@ Batching gains only 10%. Timing the two phases of one request shows why:
   for a batch of 8. It is limited by reading the weights from memory, which a batch shares.
   But a batch only finishes when its longest answer does.
 
-The bigger lever is the prompt: 372 of its ~550 tokens are the system prompt, the same for
-every request. Caching its attention keys and values once would skip most of the prefill.
+The bigger lever is the prompt: 377 of its ~450–600 tokens are the system prompt, the same
+for every request. So the server reads it once at startup and keeps its attention keys and
+values; each request then prefills only its own bulletin. Prefill for one bulletin, timed
+in the same process (on a slower day for the laptop than the table above):
+
+| bulletin | tokens read without cache | with cache | prefill without cache | with cache |
+|---|---|---|---|---|
+| typical | ~450 | ~75 | 26 s | 5 s |
+| long | 544 | 167 | 33 s | 10 s |
 
 ## Key ideas
 
@@ -68,7 +75,9 @@ every request. Caching its attention keys and values once would skip most of the
 - **The schema is the documentation.** FastAPI turns the Pydantic models, their field
   descriptions and an example bulletin into Swagger UI at `/docs`.
 - **Dynamic batching** (`batcher.py`): requests that arrive within 50 ms share one batch.
-  Left padding keeps the answers identical, which the slow test checks.
+- **Prefix caching** (`model.py`): the shared system prompt is computed once. Padding goes
+  between the cached prefix and each bulletin, and the attention mask hides it, so the
+  answers are the same as uncached, which the slow test checks.
 - **Measure before optimising.** The load test showed batching barely helps on a CPU, and
   timing prefill and decode showed why.
 - **Inject the model.** `create_app(load=...)` lets the tests swap in a fake model, so
