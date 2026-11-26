@@ -22,6 +22,14 @@ curl -X POST http://127.0.0.1:8000/extract -H "Content-Type: application/json" \
   -d '{"text": "Gliding avalanches are possible on steep grassy slopes."}'
 ```
 
+The answer fills in what the text leaves out, following SLF's conventions (gliding snow has
+no elevation bound and a low danger level):
+
+```json
+{"problems": [{"type": "gliding_snow", "danger_level": 1, "danger_modifier": null,
+  "aspects": [], "elevation_lower": null, "elevation_upper": null}]}
+```
+
 With Docker, the image has the models baked in (6.5 GB) and runs on any server:
 
 ```bash
